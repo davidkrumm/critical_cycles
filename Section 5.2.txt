@@ -1,0 +1,339 @@
+/* 
+This file contains MAGMA and SAGE code used for calculations in Section 5.2. This includes:
+ - Preliminary computations (starting on line 8)
+ - Proof of Proposition 5.2 (line 104)
+ - Calculations for Remark 5.4 (line 322)
+*/
+
+//// *** Setup preceding Proposition 5.2 (in MAGMA) *** ////
+
+load "DynamicalModularCurves.m";
+
+// Compute the resultant of the numerator and denominator of phi.
+
+Qt<t> := PolynomialRing(Rationals());
+_<x> := PolynomialRing(Qt);
+phi := ((t + t^2 - t^3)*x - t^2)/((t^3 - t^2 - t + 1)*x^2 - (t^3 - t^2 - t)*x - t^2);
+assert Resultant(Numerator(phi),Denominator(phi)) eq t^4*(t + 1)*(t - 1)^2;
+
+// Construct the portrait I1 contained in G(phi,Q(t)).
+
+A := 1/(1 - t);
+B := -t/(t^2 - t - 1);
+Q := t/(1 - t^2);
+assert Evaluate(phi,0) eq 1;
+assert Evaluate(phi,1) eq t;
+assert Evaluate(phi,t) eq B;
+assert Evaluate(phi,B) eq 0;
+assert Evaluate(phi,A) eq B;
+assert Evaluate(phi,Q) eq t;
+
+/* Check that Y_1(2,2) is a geometrically irreducible curve of genus 6.
+Moreover, it is not geometrically hyperelliptic, and has 5 known rational points.
+*/
+crvs, exc := GeneralizedDynatomicCurves(phi,2,2);
+exc; //{ -1, 0, 1 }
+assert #crvs eq 1;
+Y := crvs[1];
+assert IsAbsolutelyIrreducible(Y);
+assert Genus(Y) eq 6;
+assert not IsGeometricallyHyperelliptic(Y);
+PointSearch(Y,10^6); // [ (1, 1), (0, -1), (0, 0), (0, 1), (-1, 1) ]
+
+// Attempt to find nontrivial quotients of Y_1(2,2).
+G := AutomorphismGroup(ProjectiveClosure(Y)); //killed -- too slow
+
+crvs, exc := PreimageCurves_infinity(phi,1);
+exc; //{ 0 }
+assert #crvs eq 1;
+crv := crvs[1];
+X := ProjectiveClosure(crv);
+p := PointSearch(X,100)[1];
+E := EllipticCurve(X,p);
+assert Rank(E) eq 1;
+
+/* Check that Y_1(2,infty) is a geometrically irreducible curve of genus 5.
+Moreover, it is not geometrically hyperelliptic, and has 3 known rational points.
+*/
+
+crvs, exc := PreimageCurves_infinity(phi,2);
+exc; //{ -1, 0, 1 }
+assert #crvs eq 1;
+Y := crvs[1];
+assert IsAbsolutelyIrreducible(Y);
+assert Genus(Y) eq 5;
+assert not IsGeometricallyHyperelliptic(Y);
+PointSearch(Y,10^6); // [ (1, 1), (0, 0), (-1, 1) ]
+
+// Attempt to find nontrivial quotients of Y_1(2,infty).
+G := AutomorphismGroup(ProjectiveClosure(Y)); //killed -- too slow
+
+
+/* Check that the fiber product F is a geometrically irreducible curve of genus 5.
+Moreover, it is not geometrically hyperelliptic, and has 9 known rational points.
+*/
+
+// Construct a model for F in Spec Q[t,x,z].
+
+crvs, exc := DynatomicCurves(phi,2);
+exc; //{ 1 }
+assert #crvs eq 1;
+D1 := DefiningPolynomial(crvs[1]);
+
+crvs, exc := PreimageCurves_infinity(phi,1);
+exc; // { -1, 0, 1 }
+assert #crvs eq 1;
+D2 := DefiningPolynomial(crvs[1]);
+
+A3<t,x,z> := AffineSpace(Rationals(),3);
+F1 := Evaluate(D1,[t,x]);
+F2 := Evaluate(D2,[t,z]);
+F := Curve(Scheme(A3,[F1,F2]));
+
+assert IsAbsolutelyIrreducible(F);
+assert Genus(F) eq 5;
+assert not IsGeometricallyHyperelliptic(F);
+pts := PointSearch(F,10^8);
+#pts; // 9
+{p[1]: p in pts}; // { -1, 0, 1, 5/2 }
+
+// Attempt to find nontrivial quotients of the fiber product F.
+G := AutomorphismGroup(ProjectiveClosure(F)); //killed -- too slow
+
+
+//// *** Proof of Proposition 5.2 *** ////
+
+/* The curve Y_1(1) has genus 2 and rank 1. 
+A Chabauty argument finds its rational points. */
+
+DC, exc := DynatomicCurves(phi,1);
+exc; // { -1, 1 }
+assert #DC eq 1;
+Y := DC[1];
+assert Genus(Y) eq 2;
+is_hyper,X,Y_to_X := IsHyperelliptic(Y);
+C, X_to_C := SimplifiedModel(X);
+J := Jacobian(C);
+RankBounds(J); // 1 1
+for J_pt in Points(J:Bound:=10^3) do
+	if Order(J_pt) eq 0 then
+		C_pts := Chabauty(J_pt);
+		break;
+	end if;
+end for;
+assert #C_pts eq 7;
+
+// All points on C are found. Now pull them back to X and then Y.
+
+X_pts := {@ Pullback(X_to_C,pt): pt in C_pts @};
+Y_pts := BasePoints(Y_to_X);
+for pt in X_pts do
+	Y_pts join:= Points(Pullback(Y_to_X,pt));
+end for;
+{p[1]: p in Y_pts} join exc; // { -1, 0, 1/6, 1 }
+
+// Hence every rational point on Y_1(1) has c in { -1, 0, 1/6, 1 }.
+
+
+// The curve Y_t(3) is elliptic of rank 0 and has a single rational point.
+
+crvs, exc := TraceCurves(phi,3);
+exc; // { -1, 1 }
+assert #crvs eq 1;
+Yt := crvs[1];
+X := ProjectiveClosure(Yt);
+pt := X ! [1,1,0];
+assert IsNonsingular(pt);
+E, X_to_E := EllipticCurve(X,pt);
+torsion_group, torsion_map := TorsionSubgroup(E);
+E_pts := {torsion_map(q): q in torsion_group};
+X_pts := BasePoints(X_to_E);
+	for q in E_pts do
+		X_pts join:= Points(Pullback(X_to_E,q));
+	end for;
+Yt_pts := {@ @};
+for p in X_pts do
+	if p[3] ne 0 then
+		Include(~Yt_pts, Yt ! [p[1]/p[3],p[2]/p[3]]);
+	end if;
+end for;
+{p[1]: p in Yt_pts} join exc; // { 0, 1 }
+Yt_pts; // {@ (0, 1) @}
+
+// Hence every rational point on Y_t(3) has c in { 0, 1 }.
+
+// Pull back the rational point of Yt(3) to Y_1(3).
+
+m := TraceCovering(phi,3);
+Y1 := Domain(m);
+Yt := Codomain(m);
+
+Y1_pts := BasePoints(m);
+Y1_pts join:= Points(Pullback(m,Yt![0,1]));
+{p[1]: p in Y1_pts}; // { -1, 0, 1 }
+
+// Hence every rational point on Y_1(3) has c in {-1, 0, 1 }.
+
+
+// Second dynatomic polynomial of phi
+dp := DynatomicPolynomial(phi,2);
+dp; // (t - 1)*x^2 + (-t^2 + 2)*x - t
+assert Discriminant(dp) eq t^4 - 4*t + 4;
+
+/* The curve Y_t(4) has one component, V, of genus 2 and rank 1. 
+A Chabauty argument finds its rational points. */
+
+m := TraceCovering(phi,4);
+Y1 := Domain(m);
+Yt := Codomain(m);
+Y1_comps := [Curve(i): i in IrreducibleComponents(Y1)];
+[Genus(C): C in Y1_comps]; // [ 0, 0, 0, 0, 24 ]
+U := Y1_comps[5];
+Yt_comps := [Curve(i): i in IrreducibleComponents(Yt)];
+[Genus(C): C in Yt_comps]; // [ 0, 2 ]
+V := Yt_comps[2];
+U_to_V := map<U->V|DefiningPolynomials(m)>;
+
+// Finding rational points on V.
+
+is_hyper,X,V_to_X := IsHyperelliptic(V);
+C, X_to_C := SimplifiedModel(X);
+J := Jacobian(C);
+RankBounds(J); // 1 1
+for J_pt in Points(J:Bound:=10^3) do
+	if Order(J_pt) eq 0 then
+		C_pts := Chabauty(J_pt);
+		break;
+	end if;
+end for;
+assert #C_pts eq 8;
+X_pts := {@ Pullback(X_to_C,pt): pt in C_pts @};
+V_pts := BasePoints(V_to_X);
+for pt in X_pts do
+	V_pts join:= Points(Pullback(V_to_X,pt));
+end for;
+{p[1]: p in V_pts} join exc; // { -2, 0, 1 }
+V_pts; // {@ (-2, -8/9), (0, 0), (-2, -7/9), (0, 1) @}
+
+// Hence every rational point on V has c in {-2, -1, 0, 1 }.
+
+// Pull back rational points on V to U.
+
+U_pts := BasePoints(U_to_V);
+for pt in V_pts do
+	U_pts join:= Points(Pullback(U_to_V,pt));
+end for;
+U_pts; // {@ (-1, 1), (0, 0), (0, 1), (1, 1) @}
+
+// Hence every rational point on U has c in {-1, 0, 1 }.
+
+
+/* The curve Y(1,A), or phi = A, has genus 2 and rank 1. 
+A Chabauty argument finds its rational points. */
+
+crvs, exc := PreimageCurves_finite(phi,1,A);
+exc; // { -1, 0, 1 }
+assert #crvs eq 1;
+Y := crvs[1];
+assert Genus(Y) eq 2;
+is_hyper,X,Y_to_X := IsHyperelliptic(Y);
+C, X_to_C := SimplifiedModel(X);
+J := Jacobian(C);
+RankBounds(J); // 1 1
+for J_pt in Points(J:Bound:=10^3) do
+	if Order(J_pt) eq 0 then
+		C_pts := Chabauty(J_pt);
+		break;
+	end if;
+end for;
+assert #C_pts eq 7;
+X_pts := {@ Pullback(X_to_C,pt): pt in C_pts @};
+Y_pts := BasePoints(Y_to_X);
+for pt in X_pts do
+	Y_pts join:= Points(Pullback(Y_to_X,pt));
+end for;
+{p[1]: p in Y_pts} join exc; // { -1, 0, 1 }
+
+// Hence every rational point on Y(1,A) has c in { -1, 0, 1 }.
+
+
+/* The curve Y(1,Q), or phi = Q, has genus 3 and rank 1. 
+The Chabauty package of Balakrishnan and Tuitman finds its rational points. */
+
+load "coleman/coleman.m";
+
+# Finds an upper bound for the number of rational points on given hyperelliptic curve.
+ChabautyBound := function(hyper_poly,bad_primes)
+	f := Qx ! hyper_poly;
+	precision := 20;
+	upper_bounds := {};
+	for p in PrimesInInterval(2,20) do
+		if p notin bad_primes then
+			c_data := coleman_data(Qxy.1^2 - f,p,precision);
+			c_bound := #effective_chabauty(c_data:bound:=10^5,e:=50);
+			Include(~upper_bounds,c_bound);
+		end if;
+	end for;
+	if #upper_bounds gt 0 then
+		return true, Minimum(upper_bounds);
+	end if;
+	return false,_;
+end function;
+
+// Finding rational points on Y(1,Q).
+
+crvs, exc := PreimageCurves_finite(phi,1,Q);
+exc; //{ -1, 0, 1 }
+assert #crvs eq 1;
+Y := crvs[1];
+is_hyper,X,Y_to_X := IsHyperelliptic(Y);
+C, X_to_C := SimplifiedModel(X);
+assert Genus(C) eq 3;
+J := Jacobian(C);
+RankBound(J); 
+C_poly,_ := HyperellipticPolynomials(C);
+ChabautyBound(C_poly,BadPrimes(C)); // true 8
+C_pts := Points(C: Bound:= 10^6);
+assert #C_pts eq 8;
+
+/* The upper bound agrees with the number of known points on C,
+so all rational points on C are found. Now pull back to X and then Y. */
+
+X_pts := {@ Pullback(X_to_C,pt): pt in C_pts @};
+Y_pts := BasePoints(Y_to_X);
+for pt in X_pts do
+	Y_pts join:= Points(Pullback(Y_to_X,pt));
+end for;
+{p[1]: p in Y_pts} join exc; // { -1, 0, 1 }
+
+// Hence every rational point on Y(1,A) has c in { -1, 0, 1 }.
+
+
+// The curve phi = 1 is given by x = 0 in Spec Q[t,x].
+
+crvs, exc := PreimageCurves_finite(phi,1,1);
+exc; // { -1, 0, 1 }
+assert #crvs eq 1;
+Y := crvs[1];
+AmbientSpace(Y); // Affine Space of dimension 2 over Rational Field Variables: $.1, $.2
+DefiningPolynomial(Y); // $.2
+
+
+//// *** Calculations for Remark 5.4 *** ////
+
+crvs, exc := TraceCurves(phi,5);
+exc; // { -1, 0, 1 }
+assert #crvs eq 1;
+PointSearch(crvs[1],10^7); // [ (0, 1) ]
+
+crvs, exc := TraceCurves(phi,6);
+exc; //{ -1, 0, 1 }
+assert #crvs eq 1;
+PointSearch(crvs[1],10^7); // [ (0, -1), (0, 3), (0, 2), (0, 1), (-1, 3/2) ]
+
+crvs, exc := TraceCurves(phi,7);
+exc; //{ -1, 0, 1 }
+assert #crvs eq 1;
+PointSearch(crvs[1],10^7); // [ (0, 1), (0, 2) ]
+
+
