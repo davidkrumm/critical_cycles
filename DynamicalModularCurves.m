@@ -238,9 +238,9 @@ PreimageCurves_finite := function(phi,m,P)
 end function;
 
 /* Computes an affine plane model of the mth preimage curve Y(m,infinity).
-A list of irreducible components of Y(m,\infinity) is returned. In addition, a finite subset
+A list of irreducible components of Y(m,infinity) is returned. In addition, a finite subset
 F of Q is returned, with the property that if c is not in F and alpha is an algebraic number with
-phi_c^m(alpha) = infinity, then the pair (c,alpha) represents a point on Y_1(m,infinity). */
+phi_c^m(alpha) = infinity, then the pair (c,alpha) represents a point on Y(m,infinity). */
 PreimageCurves_infinity := function(phi,m)
 	phi_m := Iterate(phi,m);
 	curves, exc := Z(1/phi_m);
